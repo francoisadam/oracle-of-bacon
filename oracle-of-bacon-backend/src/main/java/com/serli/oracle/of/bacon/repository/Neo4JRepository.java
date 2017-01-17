@@ -1,11 +1,10 @@
 package com.serli.oracle.of.bacon.repository;
 
 
-import org.neo4j.driver.v1.AuthTokens;
-import org.neo4j.driver.v1.Driver;
-import org.neo4j.driver.v1.GraphDatabase;
-import org.neo4j.driver.v1.Session;
+import org.neo4j.driver.v1.*;
+import org.neo4j.driver.v1.types.Relationship;
 
+import java.util.ArrayList;
 import java.util.List;
 
 
@@ -16,11 +15,64 @@ public class Neo4JRepository {
         driver = GraphDatabase.driver("bolt://localhost:7687", AuthTokens.basic("neo4j", "password"));
     }
 
-    public List<?> getConnectionsToKevinBacon(String actorName) {
-        Session session = driver.session();
+    public String getConnectionsToKevinBacon(String actorName) {
+        String json = "[\n";
 
-        // TODO implement Oracle of Bacon
-        return null;
+        Session session = driver.session();
+        Statement statement = new Statement("MATCH (Bacon:Actor {name:'Bacon, Kevin (I)'}), (TargetActor:Actor {name:'" + actorName + "'}), p = shortestPath((Bacon)-[*]-(TargetActor)) RETURN nodes(p), relationships(p)");
+        StatementResult result = session.run(statement);
+        Record record = result.single();
+        Iterable<Value> nodes = record.get(0).values();
+        Iterable<Value> relationships = record.get(1).values();
+
+        List<GraphItem> graphItems = new ArrayList<>();
+        for (Value v: nodes) {
+            json += "{ \n \"data\":{ \n";
+
+            long id = v.asNode().id();
+            json += "\"id\":"+id+",\n";
+
+            GraphNode graphNode;
+            String value;
+
+            if (v.get("name").asString() != "null") {
+                json += "\"type\":\"Actor\",\n";
+                value = v.get("name").asString();
+                graphNode = new GraphNode(id, value, "Actor");
+            }
+            else {
+                json += "\"type\":\"Movie\",\n";
+                value = v.get("title").asString();
+                graphNode = new GraphNode(id, value, "Movie");
+            }
+            graphItems.add(graphNode);
+            json+= "\"value\":\""+value+"\"\n";
+
+            json += "} \n }, \n";
+        }
+
+        for (Value v: relationships) {
+            json += "{ \n \"data\":{ \n";
+
+            Relationship r = v.asRelationship();
+            long id = r.id();
+            json += "\"id\":"+id+",\n";
+
+            long source = r.startNodeId();
+            json += "\"source\":"+source+",\n";
+
+            long target = r.endNodeId();
+            json += "\"target\":"+target+",\n";
+            json += "\"value\":\"PLAYED_IN\"\n";
+
+            GraphEdge graphEdge = new GraphEdge(id, source, target, "PLAYED_IN");
+            graphItems.add(graphEdge);
+
+            json += "}\n},\n";
+        }
+        json = json.substring(0,json.length()-2) + "\n]";
+
+        return json;
     }
 
     private static abstract class GraphItem {
