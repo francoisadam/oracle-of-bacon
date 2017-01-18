@@ -19,35 +19,29 @@ public class Neo4JRepository {
         String json = "[\n";
 
         Session session = driver.session();
-        Statement statement = new Statement("MATCH (Bacon:Actor {name:'Bacon, Kevin (I)'}), (TargetActor:Actor {name:'" + actorName + "'}), p = shortestPath((Bacon)-[*]-(TargetActor)) RETURN nodes(p), relationships(p)");
+        Statement statement = new Statement("MATCH (Bacon:Actor {name:'Bacon, Kevin (I)'}), (TargetActor:Actor {name:'"
+                + actorName + "'}), p = shortestPath((Bacon)-[*]-(TargetActor)) RETURN nodes(p), relationships(p)");
         StatementResult result = session.run(statement);
         Record record = result.single();
         Iterable<Value> nodes = record.get(0).values();
         Iterable<Value> relationships = record.get(1).values();
 
-        List<GraphItem> graphItems = new ArrayList<>();
         for (Value v: nodes) {
             json += "{ \n \"data\":{ \n";
 
             long id = v.asNode().id();
             json += "\"id\":"+id+",\n";
 
-            GraphNode graphNode;
             String value;
-
             if (v.get("name").asString() != "null") {
                 json += "\"type\":\"Actor\",\n";
                 value = v.get("name").asString();
-                graphNode = new GraphNode(id, value, "Actor");
             }
             else {
                 json += "\"type\":\"Movie\",\n";
                 value = v.get("title").asString();
-                graphNode = new GraphNode(id, value, "Movie");
             }
-            graphItems.add(graphNode);
             json+= "\"value\":\""+value+"\"\n";
-
             json += "} \n }, \n";
         }
 
@@ -64,10 +58,6 @@ public class Neo4JRepository {
             long target = r.endNodeId();
             json += "\"target\":"+target+",\n";
             json += "\"value\":\"PLAYED_IN\"\n";
-
-            GraphEdge graphEdge = new GraphEdge(id, source, target, "PLAYED_IN");
-            graphItems.add(graphEdge);
-
             json += "}\n},\n";
         }
         json = json.substring(0,json.length()-2) + "\n]";
